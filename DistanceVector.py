@@ -1,3 +1,5 @@
+import sys
+
 # Neighbor class to store neighbor router and link cost
 class Neighbor:
     def __init__(self, neighbor, cost):
@@ -23,9 +25,15 @@ class Graph:
             self.net[neighbor].append(Neighbor(source, weight))
 
 def main():
-    # Test Graph functionality
     net = Graph()
-    net.add_edge("X", "Y", 3)
+    # Read router names until DISTANCEVECTOR
+    while True:
+        line = sys.stdin.readline().strip()
+        if line == "DISTANCEVECTOR":
+            break
+        net.add_node(line)
+    
+    # Print network for verification
     for node, neighbors in net.net.items():
         print(f"{node}: {[ (n.neighbor, n.cost) for n in neighbors ]}")
 
