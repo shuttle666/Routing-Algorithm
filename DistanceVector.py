@@ -33,6 +33,15 @@ def main():
             break
         net.add_node(line)
     
+    # Read initial topology until UPDATE
+    while True:
+        line = sys.stdin.readline().strip()
+        if line == "UPDATE":
+            break
+        source, neighbor, weight = line.split()
+        weight = int(weight)
+        net.add_edge(source, neighbor, weight)
+    
     # Print network for verification
     for node, neighbors in net.net.items():
         print(f"{node}: {[ (n.neighbor, n.cost) for n in neighbors ]}")
