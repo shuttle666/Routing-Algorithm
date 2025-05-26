@@ -24,6 +24,11 @@ class Graph:
             self.net[source].append(Neighbor(neighbor, weight))
             self.net[neighbor].append(Neighbor(source, weight))
 
+def get_router_index(net):
+    """Create a sorted router name to index mapping."""
+    routers = sorted(net.net.keys())
+    return {router: idx for idx, router in enumerate(routers)}
+
 def main():
     net = Graph()
     # Read router names until DISTANCEVECTOR
@@ -42,9 +47,8 @@ def main():
         weight = int(weight)
         net.add_edge(source, neighbor, weight)
     
-    # Print network for verification
-    for node, neighbors in net.net.items():
-        print(f"{node}: {[ (n.neighbor, n.cost) for n in neighbors ]}")
+    router_index = get_router_index(net)
+    print("Router Index:", router_index)
 
 if __name__ == "__main__":
     main()
