@@ -24,6 +24,21 @@ class Graph:
             self.net[source].append(Neighbor(neighbor, weight))
             self.net[neighbor].append(Neighbor(source, weight))
 
+# DistanceTable class to store distance table for a router
+class DistanceTable:
+    def __init__(self):
+        self.table = {}  # {dest: {via: cost}}
+
+    def set_cost(self, dest, via, cost):
+        """Set cost to dest via neighbor."""
+        if dest not in self.table:
+            self.table[dest] = {}
+        self.table[dest][via] = cost
+
+    def get_cost(self, dest, via):
+        """Get cost to dest via neighbor, return 'INF' if not set."""
+        return self.table.get(dest, {}).get(via, 'INF')
+
 def get_router_index(net):
     """Create a sorted router name to index mapping."""
     routers = sorted(net.net.keys())
@@ -48,7 +63,10 @@ def main():
         net.add_edge(source, neighbor, weight)
     
     router_index = get_router_index(net)
-    print("Router Index:", router_index)
+    # Test DistanceTable
+    table = DistanceTable()
+    table.set_cost("Y", "Z", 3)
+    print(f"Cost to Y via Z: {table.get_cost('Y', 'Z')}")
 
 if __name__ == "__main__":
     main()
