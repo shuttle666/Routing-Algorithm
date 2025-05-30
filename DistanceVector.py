@@ -44,6 +44,22 @@ def get_router_index(net):
     routers = sorted(net.net.keys())
     return {router: idx for idx, router in enumerate(routers)}
 
+def initialize_tables(net, routers, router_index):
+    """Initialize neighbors_cost and min_cost tables."""
+    n = len(routers)
+    neighbors_cost = [[-1] * n for _ in range(n)]
+    min_cost = [[None] * n for _ in range(n)]
+    distance_table = [[DistanceTable() for _ in range(n)] for _ in range(n)]
+
+    # Initialize min_cost (cost to self is 0) and neighbors_cost
+    for router in routers:
+        idx = router_index[router]
+        min_cost[idx][idx] = Neighbor(router, 0)
+        for neighbor in net.net[router]:
+            neighbors_cost[idx][router_index[neighbor.neighbor]] = neighbor.cost
+
+    return neighbors_cost, min_cost, distance_table
+
 def main():
     net = Graph()
     # Read router names until DISTANCEVECTOR
@@ -63,10 +79,11 @@ def main():
         net.add_edge(source, neighbor, weight)
     
     router_index = get_router_index(net)
-    # Test DistanceTable
-    table = DistanceTable()
-    table.set_cost("Y", "Z", 3)
-    print(f"Cost to Y via Z: {table.get_cost('Y', 'Z')}")
+    routers = sorted(net.net.keys())
+    neighbors_cost, min_cost, distance_table = initialize_tables(net, routers, router_index)
+    
+    # Print for verification
+    print("Neighbors Cost:", neighbors_cost)
 
 if __name__ == "__main__":
     main()
