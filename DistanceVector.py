@@ -75,6 +75,25 @@ def get_min_cost(distance_table, router, dest, router_index, routers):
                 min_via = via
     return Neighbor(min_via, min_cost) if min_via else None
 
+def print_distance_table(routers, distance_table, router_index, t):
+    """Print distance table for each router at time t."""
+    for router in routers:
+        print(f"Distance Table of router {router} at t={t}:")
+        print("    ", end="")
+        for dest in routers:
+            if dest != router:
+                print(f"{dest:5}", end="")
+        print()
+        for dest in routers:
+            if dest != router:
+                print(f"{dest:5}", end="")
+                for via in routers:
+                    if via != router:
+                        cost = distance_table[router_index[router]][router_index[dest]].get_cost(dest, via)
+                        print(f"{cost:5}", end="")
+                print()
+        print()
+
 def distance_vector(net, routers, router_index):
     """Implement Distance Vector algorithm."""
     n = len(routers)
@@ -98,6 +117,7 @@ def distance_vector(net, routers, router_index):
                                 distance_table[i][j].set_cost(dest, via, cost)
                                 changed = True
                     min_cost_new[i][j] = get_min_cost(distance_table, router, dest, router_index, routers)
+        print_distance_table(routers, distance_table, router_index, t)
         if not changed:
             break
         min_cost = min_cost_new
@@ -126,9 +146,6 @@ def main():
     router_index = get_router_index(net)
     routers = sorted(net.net.keys())
     distance_table, min_cost = distance_vector(net, routers, router_index)
-    
-    # Print for verification
-    print(f"Converged at t={t}")
 
 if __name__ == "__main__":
     main()
