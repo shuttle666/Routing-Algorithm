@@ -60,6 +60,51 @@ def initialize_tables(net, routers, router_index):
 
     return neighbors_cost, min_cost, distance_table
 
+def get_min_cost(distance_table, router, dest, router_index, routers):
+    """Get minimum cost path from router to dest, choosing lowest via by name."""
+    table = distance_table[router_index[router]][router_index[dest]].table.get(dest, {})
+    min_cost = float('inf')
+    min_via = None
+    for via in routers:
+        if via != router:
+            cost = table.get(via, 'INF')
+            if cost != 'INF' and int(cost) < min_cost:
+                min_cost = int(cost)
+                min_via = via
+            elif cost != 'INF' and int(cost) == min_cost and via < min_via:
+                min_via = via
+    return Neighbor(min_via, min_cost) if min_via else None
+
+def distance_vector(net, routers, router_index):
+    """Implement Distance Vector algorithm."""
+    n = len(routers)
+    neighbors_cost, min_cost, distance_table = initialize_tables(net, routers, router_index)
+    global t
+    t = 0
+
+    while True:
+        changed = False
+        min_cost_new = [[None] * n for _ in range(n)]
+        for i, router in enumerate(routers):
+            for j, dest in enumerate(routers):
+                if router != dest:
+                    for k, via in enumerate(routers):
+                        if router != via:
+                            nc = neighbors_cost[i][k]
+                            mc = min_cost[k][j].cost if min_cost[k][j] else -1
+                            cost = 'INF' if nc == -1 or mc == -1 else nc + mc
+                            old_cost = distance_table[i][j].get_cost(dest, via)
+                            if old_cost != cost:
+                                distance_table[i][j].set_cost(dest, via, cost)
+                                changed = True
+                    min_cost_new[i][j] = get_min_cost(distance_table, router, dest, router_index, routers)
+        if not changed:
+            break
+        min_cost = min_cost_new
+        t += 1
+
+    return distance_table, min_cost
+
 def main():
     net = Graph()
     # Read router names until DISTANCEVECTOR
@@ -80,10 +125,10 @@ def main():
     
     router_index = get_router_index(net)
     routers = sorted(net.net.keys())
-    neighbors_cost, min_cost, distance_table = initialize_tables(net, routers, router_index)
+    distance_table, min_cost = distance_vector(net, routers, router_index)
     
     # Print for verification
-    print("Neighbors Cost:", neighbors_cost)
+    print(f"Converged at t={t}")
 
 if __name__ == "__main__":
     main()
