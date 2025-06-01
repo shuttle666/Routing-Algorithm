@@ -107,16 +107,25 @@ def print_distance_table(routers, distance_table, router_index, t):
                 print()
         print()
 
-def print_routing_table(routers, min_cost, router_index):
+def print_routing_table(routers, min_cost, router_index, neighbors_cost):
     """Print routing table for each router after convergence."""
     for router in routers:
         print(f"Routing Table of router {router}:")
+        i = router_index[router]
         for dest in routers:
             if dest != router:
-                via_obj = min_cost[router_index[router]][router_index[dest]]
-                via = via_obj.neighbor if via_obj else "INF"
-                cost = via_obj.cost if via_obj else "INF"
-                print(f"{dest},{via},{cost}")
+                j = router_index[dest]
+                via_obj = min_cost[i][j]
+                if via_obj and via_obj.cost != float('inf'):
+                    via = via_obj.neighbor
+                    cost = via_obj.cost
+                    # Verify via is a direct neighbor
+                    if neighbors_cost[i][router_index[via]] != -1:
+                        print(f"{dest},{via},{cost}")
+                    else:
+                        print(f"{dest},INF,INF")
+                else:
+                    print(f"{dest},INF,INF")
         print()
 
 def merge_tables(old_min_cost, old_distance_table, old_router_index, new_routers, new_router_index):
@@ -167,19 +176,19 @@ def distance_vector(net, routers, router_index, old_min_cost=None, old_distance_
         min_cost = min_cost_new
         t += 1
 
-    print_routing_table(routers, min_cost, router_index)
+    print_routing_table(routers, min_cost, router_index, neighbors_cost)
     return distance_table, min_cost
 
 def main():
     net = Graph()
-    # Read router names until DISTANCEVECTOR
+    # Read router names until START
     while True:
         line = sys.stdin.readline().strip()
         if not line:
             return
-        if line == "DISTANCEVECTOR":
+        if line == "START":
             break
-        if not line.isalpha():
+        if any(c.isdigit() for c in line) or ' ' in line:
             print("Error: Invalid router name")
             return
         net.add_node(line)
@@ -201,7 +210,10 @@ def main():
     
     router_index = get_router_index(net)
     routers = sorted(net.net.keys())
-    distance_table, min_cost = distance_vector(net, routers, router_index)
+    if routers:  # Run DV only if there are routers
+        distance_table, min_cost = distance_vector(net, routers, router_index)
+    else:
+        return
     
     # Read updates until END
     updates = []
@@ -222,7 +234,8 @@ def main():
             net.update_edge(source, neighbor, weight)
         new_router_index = get_router_index(net)
         new_routers = sorted(net.net.keys())
-        distance_vector(net, new_routers, new_router_index, min_cost, distance_table, router_index)
+        if new_routers:  # Run DV only if there are routers
+            distance_vector(net, new_routers, new_router_index, min_cost, distance_table, router_index)
 
 if __name__ == "__main__":
     main()
