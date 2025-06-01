@@ -32,8 +32,12 @@ class Graph:
                 self.net[source] = [n for n in self.net[source] if n.neighbor != neighbor]
             if neighbor in self.net:
                 self.net[neighbor] = [n for n in self.net[neighbor] if n.neighbor != source]
+            # Remove empty nodes
+            if source in self.net and not self.net[source]:
+                del self.net[source]
+            if neighbor in self.net and not self.net[neighbor]:
+                del self.net[neighbor]
         else:
-            # Remove existing edge and add new one
             self.update_edge(source, neighbor, -1)
             self.add_edge(source, neighbor, weight)
 
@@ -49,8 +53,8 @@ class DistanceTable:
         self.table[dest][via] = cost
 
     def get_cost(self, dest, via):
-        """Get cost to dest via neighbor, return 'INF' if not set."""
-        return self.table.get(dest, {}).get(via, 'INF')
+        """Get cost to dest via neighbor, return float('inf') if not set."""
+        return self.table.get(dest, {}).get(via, float('inf'))
 
 def get_router_index(net):
     """Create a sorted router name to index mapping."""
@@ -80,11 +84,11 @@ def get_min_cost(distance_table, router, dest, router_index, routers):
     min_via = None
     for via in routers:
         if via != router:
-            cost = table.get(via, 'INF')
-            if cost != 'INF' and int(cost) < min_cost:
-                min_cost = int(cost)
+            cost = table.get(via, float('inf'))
+            if cost < min_cost:
+                min_cost = cost
                 min_via = via
-            elif cost != 'INF' and int(cost) == min_cost and via < min_via:
+            elif cost == min_cost and cost != float('inf') and min_via is not None and via < min_via:
                 min_via = via
     return Neighbor(min_via, min_cost) if min_via else None
 
@@ -103,7 +107,7 @@ def print_distance_table(routers, distance_table, router_index, t):
                 for via in routers:
                     if via != router:
                         cost = distance_table[router_index[router]][router_index[dest]].get_cost(dest, via)
-                        print(f"{cost:5}", end="")
+                        print(f"{cost if cost != float('inf') else 'INF':5}", end="")
                 print()
         print()
 
@@ -128,54 +132,66 @@ def print_routing_table(routers, min_cost, router_index, neighbors_cost):
                     print(f"{dest},INF,INF")
         print()
 
-def merge_tables(old_min_cost, old_distance_table, old_router_index, new_routers, new_router_index):
-    """Merge old tables into new tables for updated topology."""
-    n = len(new_routers)
-    new_min_cost = [[None] * n for _ in range(n)]
-    new_distance_table = [[DistanceTable() for _ in range(n)] for _ in range(n)]
-    for router in new_routers:
-        i = new_router_index[router]
-        new_min_cost[i][i] = Neighbor(router, 0)
-        if router in old_router_index:
-            old_i = old_router_index[router]
-            for dest in new_routers:
-                if dest in old_router_index:
-                    old_j = old_router_index[dest]
-                    new_min_cost[i][new_router_index[dest]] = old_min_cost[old_i][old_j]
-                    new_distance_table[i][new_router_index[dest]] = old_distance_table[old_i][old_j]
-    return new_min_cost, new_distance_table
-
-def distance_vector(net, routers, router_index, old_min_cost=None, old_distance_table=None, old_router_index=None):
-    """Implement Distance Vector algorithm."""
+def distance_vector(net, routers, router_index):
+    """Implement Distance Vector algorithm with proper convergence."""
     n = len(routers)
     neighbors_cost, min_cost, distance_table = initialize_tables(net, routers, router_index)
-    if old_min_cost and old_distance_table and old_router_index:
-        min_cost, distance_table = merge_tables(old_min_cost, old_distance_table, old_router_index, routers, router_index)
-    global t
+    
     t = 0
-
-    while True:
+    max_iterations = 1000  # 防止无限循环
+    
+    while t < max_iterations:
         changed = False
+        min_cost_changed = False
+        
+        # 创建新的min_cost表来检测变化
         min_cost_new = [[None] * n for _ in range(n)]
+        
+        # 初始化对角线（到自己的距离为0）
+        for i, router in enumerate(routers):
+            min_cost_new[i][i] = Neighbor(router, 0)
+        
         for i, router in enumerate(routers):
             for j, dest in enumerate(routers):
                 if router != dest:
                     for k, via in enumerate(routers):
                         if router != via:
                             nc = neighbors_cost[i][k]
-                            mc = min_cost[k][j].cost if min_cost[k][j] else -1
-                            cost = 'INF' if nc == -1 or mc == -1 else nc + mc
+                            if nc != -1:  # 只有当存在直接连接时才计算
+                                mc = min_cost[k][j].cost if min_cost[k][j] and min_cost[k][j].cost != float('inf') else float('inf')
+                                cost = nc + mc if mc != float('inf') else float('inf')
+                            else:
+                                cost = float('inf')
+                            
                             old_cost = distance_table[i][j].get_cost(dest, via)
                             if old_cost != cost:
                                 distance_table[i][j].set_cost(dest, via, cost)
                                 changed = True
-                    min_cost_new[i][j] = get_min_cost(distance_table, router, dest, router_index, routers)
+                    
+                    # 计算新的最小成本路径
+                    new_min = get_min_cost(distance_table, router, dest, router_index, routers)
+                    min_cost_new[i][j] = new_min
+                    
+                    # 检查最小成本是否发生变化
+                    old_min = min_cost[i][j]
+                    if ((old_min is None and new_min is not None) or 
+                        (old_min is not None and new_min is None) or
+                        (old_min is not None and new_min is not None and 
+                         (old_min.cost != new_min.cost or old_min.neighbor != new_min.neighbor))):
+                        min_cost_changed = True
+        
         print_distance_table(routers, distance_table, router_index, t)
-        if not changed:
+        
+        # 只有当最小成本路径不再变化时才收敛
+        if not min_cost_changed:
             break
+            
         min_cost = min_cost_new
         t += 1
 
+    if t >= max_iterations:
+        print(f"Warning: Algorithm did not converge after {max_iterations} iterations")
+    
     print_routing_table(routers, min_cost, router_index, neighbors_cost)
     return distance_table, min_cost
 
@@ -234,8 +250,8 @@ def main():
             net.update_edge(source, neighbor, weight)
         new_router_index = get_router_index(net)
         new_routers = sorted(net.net.keys())
-        if new_routers:  # Run DV only if there are routers
-            distance_vector(net, new_routers, new_router_index, min_cost, distance_table, router_index)
+        if new_routers:  # 重新运行完整的DV算法，不保留旧状态
+            distance_vector(net, new_routers, new_router_index)
 
 if __name__ == "__main__":
     main()
