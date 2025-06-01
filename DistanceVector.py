@@ -24,6 +24,19 @@ class Graph:
             self.net[source].append(Neighbor(neighbor, weight))
             self.net[neighbor].append(Neighbor(source, weight))
 
+    def update_edge(self, source, neighbor, weight):
+        """Update or remove a bidirectional edge."""
+        if weight == -1:
+            # Remove edge if exists
+            if source in self.net:
+                self.net[source] = [n for n in self.net[source] if n.neighbor != neighbor]
+            if neighbor in self.net:
+                self.net[neighbor] = [n for n in self.net[neighbor] if n.neighbor != source]
+        else:
+            # Remove existing edge and add new one
+            self.update_edge(source, neighbor, -1)
+            self.add_edge(source, neighbor, weight)
+
 # DistanceTable class to store distance table for a router
 class DistanceTable:
     def __init__(self):
@@ -94,10 +107,41 @@ def print_distance_table(routers, distance_table, router_index, t):
                 print()
         print()
 
-def distance_vector(net, routers, router_index):
+def print_routing_table(routers, min_cost, router_index):
+    """Print routing table for each router after convergence."""
+    for router in routers:
+        print(f"Routing Table of router {router}:")
+        for dest in routers:
+            if dest != router:
+                via_obj = min_cost[router_index[router]][router_index[dest]]
+                via = via_obj.neighbor if via_obj else "INF"
+                cost = via_obj.cost if via_obj else "INF"
+                print(f"{dest},{via},{cost}")
+        print()
+
+def merge_tables(old_min_cost, old_distance_table, old_router_index, new_routers, new_router_index):
+    """Merge old tables into new tables for updated topology."""
+    n = len(new_routers)
+    new_min_cost = [[None] * n for _ in range(n)]
+    new_distance_table = [[DistanceTable() for _ in range(n)] for _ in range(n)]
+    for router in new_routers:
+        i = new_router_index[router]
+        new_min_cost[i][i] = Neighbor(router, 0)
+        if router in old_router_index:
+            old_i = old_router_index[router]
+            for dest in new_routers:
+                if dest in old_router_index:
+                    old_j = old_router_index[dest]
+                    new_min_cost[i][new_router_index[dest]] = old_min_cost[old_i][old_j]
+                    new_distance_table[i][new_router_index[dest]] = old_distance_table[old_i][old_j]
+    return new_min_cost, new_distance_table
+
+def distance_vector(net, routers, router_index, old_min_cost=None, old_distance_table=None, old_router_index=None):
     """Implement Distance Vector algorithm."""
     n = len(routers)
     neighbors_cost, min_cost, distance_table = initialize_tables(net, routers, router_index)
+    if old_min_cost and old_distance_table and old_router_index:
+        min_cost, distance_table = merge_tables(old_min_cost, old_distance_table, old_router_index, routers, router_index)
     global t
     t = 0
 
@@ -123,6 +167,7 @@ def distance_vector(net, routers, router_index):
         min_cost = min_cost_new
         t += 1
 
+    print_routing_table(routers, min_cost, router_index)
     return distance_table, min_cost
 
 def main():
@@ -130,22 +175,54 @@ def main():
     # Read router names until DISTANCEVECTOR
     while True:
         line = sys.stdin.readline().strip()
+        if not line:
+            return
         if line == "DISTANCEVECTOR":
             break
+        if not line.isalpha():
+            print("Error: Invalid router name")
+            return
         net.add_node(line)
     
     # Read initial topology until UPDATE
     while True:
         line = sys.stdin.readline().strip()
+        if not line:
+            return
         if line == "UPDATE":
             break
-        source, neighbor, weight = line.split()
-        weight = int(weight)
-        net.add_edge(source, neighbor, weight)
+        try:
+            source, neighbor, weight = line.split()
+            weight = int(weight)
+            net.add_edge(source, neighbor, weight)
+        except (ValueError, TypeError):
+            print("Error: Invalid topology input")
+            return
     
     router_index = get_router_index(net)
     routers = sorted(net.net.keys())
     distance_table, min_cost = distance_vector(net, routers, router_index)
+    
+    # Read updates until END
+    updates = []
+    while True:
+        line = sys.stdin.readline().strip()
+        if not line or line == "END":
+            break
+        try:
+            source, neighbor, weight = line.split()
+            weight = int(weight)
+            updates.append((source, neighbor, weight))
+        except (ValueError, TypeError):
+            print("Error: Invalid update input")
+            return
+    
+    if updates:
+        for source, neighbor, weight in updates:
+            net.update_edge(source, neighbor, weight)
+        new_router_index = get_router_index(net)
+        new_routers = sorted(net.net.keys())
+        distance_vector(net, new_routers, new_router_index, min_cost, distance_table, router_index)
 
 if __name__ == "__main__":
     main()
