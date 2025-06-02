@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 
 # Neighbor class to store neighbor router and link cost
