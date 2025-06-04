@@ -37,7 +37,7 @@ class Graph:
                 self.net[source] = [n for n in self.net[source] if n.neighbor != neighbor]
             if neighbor in self.net:
                 self.net[neighbor] = [n for n in self.net[neighbor] if n.neighbor != source]
-            # Remove nodes that have no connections
+            # Remove nodes with no connections
             if source in self.net and len(self.net[source]) == 0:
                 del self.net[source]
             if neighbor in self.net and len(self.net[neighbor]) == 0:
@@ -49,16 +49,12 @@ def print_distance_table(routers, distance_tables, t):
     """Print distance table for each router at time t."""
     for router in routers:
         print(f"Distance Table of router {router} at t={t}:")
-        
-        # Print header with destination routers
         destinations = [r for r in routers if r != router]
         if destinations:
             print("    ", end="")
             for dest in destinations:
                 print(f"{dest:5}", end="")
             print()
-            
-            # Print each row (destination) with costs via each neighbor
             for dest in destinations:
                 print(f"{dest:5}", end="")
                 for via in destinations:
@@ -83,7 +79,7 @@ def print_routing_table(routers, routing_tables):
                 print(f"{dest},INF,INF")
         print()
 
-def distance_vector_algorithm(net):
+def distance_vector_algorithm(net, start_t=0):
     """Implement Distance Vector algorithm."""
     routers = sorted(net.net.keys())
     if not routers:
@@ -93,7 +89,6 @@ def distance_vector_algorithm(net):
     distance_tables = {}
     for router in routers:
         distance_tables[router] = {}
-        # Initialize distances to direct neighbors
         neighbors = {n.neighbor: n.cost for n in net.net[router]}
         for dest in routers:
             if dest != router:
@@ -104,65 +99,56 @@ def distance_vector_algorithm(net):
                                 # Direct connection
                                 distance_tables[router][(dest, via)] = neighbors[via]
                             else:
-                                # Unknown path initially
+                                # Initialize to infinity for non-direct paths
                                 distance_tables[router][(dest, via)] = float('inf')
                         else:
                             distance_tables[router][(dest, via)] = float('inf')
     
-    t = 0
+    t = start_t
     max_iterations = 100
     
     while t < max_iterations:
         print_distance_table(routers, distance_tables, t)
         
         # Create new distance tables for this iteration
-        new_distance_tables = {}
+        new_distance_tables = {router: {} for router in routers}
+        changed = False
+        
         for router in routers:
-            new_distance_tables[router] = {}
             neighbors = {n.neighbor: n.cost for n in net.net[router]}
-            
             for dest in routers:
                 if dest != router:
                     for via in routers:
-                        if via != router and via in neighbors:
-                            if dest == via:
-                                # Direct connection
-                                new_distance_tables[router][(dest, via)] = neighbors[via]
-                            else:
-                                # Cost via this neighbor
-                                direct_cost = neighbors[via]
-                                via_to_dest_cost = float('inf')
-                                
-                                # Find minimum cost from via to dest
-                                for next_hop in routers:
-                                    if next_hop != via:
-                                        if (dest, next_hop) in distance_tables[via]:
-                                            via_to_dest_cost = min(via_to_dest_cost, 
-                                                                 distance_tables[via][(dest, next_hop)])
-                                
-                                if via_to_dest_cost != float('inf'):
-                                    new_distance_tables[router][(dest, via)] = direct_cost + via_to_dest_cost
+                        if via != router:
+                            if via in neighbors:
+                                if dest == via:
+                                    # Direct connection
+                                    new_distance_tables[router][(dest, via)] = neighbors[via]
                                 else:
-                                    new_distance_tables[router][(dest, via)] = float('inf')
-                        else:
-                            new_distance_tables[router][(dest, via)] = float('inf')
+                                    # Compute cost via this neighbor
+                                    direct_cost = neighbors[via]
+                                    # Get the minimum cost from via to dest
+                                    min_cost_via = float('inf')
+                                    for next_hop in routers:
+                                        if next_hop != via and (dest, next_hop) in distance_tables[via]:
+                                            min_cost_via = min(min_cost_via, distance_tables[via][(dest, next_hop)])
+                                    if min_cost_via != float('inf'):
+                                        new_distance_tables[router][(dest, via)] = direct_cost + min_cost_via
+                                    else:
+                                        new_distance_tables[router][(dest, via)] = float('inf')
+                                # Check for changes
+                                old_cost = distance_tables[router].get((dest, via), float('inf'))
+                                new_cost = new_distance_tables[router][(dest, via)]
+                                if old_cost != new_cost:
+                                    changed = True
+                            else:
+                                new_distance_tables[router][(dest, via)] = float('inf')
         
-        # Check for convergence
-        converged = True
-        for router in routers:
-            for key in distance_tables[router]:
-                old_cost = distance_tables[router][key]
-                new_cost = new_distance_tables[router].get(key, float('inf'))
-                if old_cost != new_cost:
-                    converged = False
-                    break
-            if not converged:
-                break
-        
+        # Update distance tables
         distance_tables = new_distance_tables
         t += 1
         
-        if converged:
+        if not changed:
             break
     
     # Generate routing tables
@@ -170,12 +156,10 @@ def distance_vector_algorithm(net):
     for router in routers:
         routing_tables[router] = {}
         neighbors = {n.neighbor: n.cost for n in net.net[router]}
-        
         for dest in routers:
             if dest != router:
                 min_cost = float('inf')
                 best_next_hop = None
-                
                 # Check all possible next hops (neighbors)
                 for via in sorted(routers):  # Sort for tie-breaking
                     if via != router and via in neighbors:
@@ -184,7 +168,6 @@ def distance_vector_algorithm(net):
                             if cost < min_cost:
                                 min_cost = cost
                                 best_next_hop = via
-                
                 if best_next_hop and min_cost != float('inf'):
                     routing_tables[router][dest] = (best_next_hop, min_cost)
     
@@ -218,7 +201,7 @@ def main():
         
         # Run distance vector algorithm for initial topology
         if net.net:
-            distance_vector_algorithm(net)
+            distance_vector_algorithm(net, start_t=0)
         
         # Read updates until END
         updates = []
@@ -236,9 +219,12 @@ def main():
         if updates:
             for source, neighbor, weight in updates:
                 net.update_edge(source, neighbor, weight)
-            
+            # Debug: Print updated topology
+            print("Updated topology:")
+            for router in sorted(net.net.keys()):
+                print(f"{router}: {[ (n.neighbor, n.cost) for n in net.net[router] ]}")
             if net.net:
-                distance_vector_algorithm(net)
+                distance_vector_algorithm(net, start_t=3)  # Start at t=3 for updates
     
     except Exception as e:
         sys.stderr.write(f"Error: {str(e)}\n")
