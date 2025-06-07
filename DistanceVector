@@ -124,40 +124,47 @@ def distance_vector_algorithm(net, start_t=0):
             for dest in routers:
                 if dest != router:
                     for via in routers:
-                        if via != router and via in neighbors:
-                            if dest == via:
-                                # Direct connection
-                                new_distance_tables[router][(dest, via)] = neighbors[via]
-                            else:
-                                # Cost via this neighbor
-                                direct_cost = neighbors[via]
-                                via_to_dest_cost = float('inf')
-                                
-                                # Find minimum cost from via to dest
-                                for next_hop in routers:
-                                    if next_hop != via:
-                                        if (dest, next_hop) in distance_tables[via]:
-                                            via_to_dest_cost = min(via_to_dest_cost, 
-                                                                 distance_tables[via][(dest, next_hop)])
-                                
-                                if via_to_dest_cost != float('inf'):
-                                    new_distance_tables[router][(dest, via)] = direct_cost + via_to_dest_cost
+                        if via != router:
+                            if via in neighbors:
+                                if dest == via:
+                                    # Direct connection
+                                    new_distance_tables[router][(dest, via)] = neighbors[via]
                                 else:
-                                    new_distance_tables[router][(dest, via)] = float('inf')
-                        else:
-                            new_distance_tables[router][(dest, via)] = float('inf')
+                                    # Cost via this neighbor
+                                    direct_cost = neighbors[via]
+                                    via_to_dest_cost = float('inf')
+                                    
+                                    # Find minimum cost from via to dest
+                                    for next_hop in routers:
+                                        if next_hop != via:
+                                            if (dest, next_hop) in distance_tables[via]:
+                                                via_to_dest_cost = min(via_to_dest_cost, 
+                                                                     distance_tables[via][(dest, next_hop)])
+                                    
+                                    if via_to_dest_cost != float('inf'):
+                                        new_distance_tables[router][(dest, via)] = direct_cost + via_to_dest_cost
+                                    else:
+                                        new_distance_tables[router][(dest, via)] = float('inf')
+                            else:
+                                # No direct connection to via, set to INF
+                                new_distance_tables[router][(dest, via)] = float('inf')
         
         # Check for convergence
         converged = True
         for router in routers:
-            for key in distance_tables[router]:
-                old_cost = distance_tables[router][key]
-                new_cost = new_distance_tables[router].get(key, float('inf'))
-                if old_cost != new_cost:
-                    converged = False
+            for dest in routers:
+                if dest != router:
+                    for via in routers:
+                        if via != router:
+                            old_cost = distance_tables[router].get((dest, via), float('inf'))
+                            new_cost = new_distance_tables[router].get((dest, via), float('inf'))
+                            if old_cost != new_cost:
+                                converged = False
+                                break
+                    if not converged:
+                        break
+                if not converged:
                     break
-            if not converged:
-                break
         
         distance_tables = new_distance_tables
         t += 1
