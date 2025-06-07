@@ -83,7 +83,7 @@ def print_routing_table(routers, routing_tables):
                 print(f"{dest},INF,INF")
         print()
 
-def distance_vector_algorithm(net):
+def distance_vector_algorithm(net, start_t=0):
     """Implement Distance Vector algorithm."""
     routers = sorted(net.net.keys())
     if not routers:
@@ -109,7 +109,7 @@ def distance_vector_algorithm(net):
                         else:
                             distance_tables[router][(dest, via)] = float('inf')
     
-    t = 0
+    t = start_t  # Use the provided start time
     max_iterations = 100
     
     while t < max_iterations:
@@ -218,7 +218,7 @@ def main():
         
         # Run distance vector algorithm for initial topology
         if net.net:
-            distance_vector_algorithm(net)
+            distance_vector_algorithm(net, start_t=0)
         
         # Read updates until END
         updates = []
@@ -238,7 +238,7 @@ def main():
                 net.update_edge(source, neighbor, weight)
             
             if net.net:
-                distance_vector_algorithm(net)
+                distance_vector_algorithm(net, start_t=3)  # Start from t=3 after updates
     
     except Exception as e:
         sys.stderr.write(f"Error: {str(e)}\n")
